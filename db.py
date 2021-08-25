@@ -1,4 +1,6 @@
 from main import db
+import requests
+import json
 
 
 class User(db.Model):
@@ -56,3 +58,17 @@ class Swiss(db.Model):
 
     def __repr__(self):
         return '<Tournament %r>' % self.name
+
+
+def fill_db():
+    swiss_as_list_of_string = requests.get('https://lichess.org/api/team/romes-papa-club/swiss').text.split('\n')
+    swiss_as_list_of_json = [json.loads(i) for i in swiss_as_list_of_string[:-1]]
+
+    for swiss in swiss_as_list_of_json:
+        entries_as_list_of_string = requests.get(f'https://lichess.org/api/swiss/{swiss["id"]}/results').text.split('\n')
+        entries_as_list_of_json = [json.loads(i) for i in entries_as_list_of_string[:-1]]
+        print(entries_as_list_of_json)
+    return swiss_as_list_of_json
+
+
+print(fill_db())
