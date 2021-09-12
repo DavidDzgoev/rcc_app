@@ -23,10 +23,10 @@ class Entry(db.Model):
     rank = db.Column(db.Integer)
     league_points = db.Column(db.Integer)
 
-    swiss_lichess_id = db.Column(db.String, db.ForeignKey('swiss.id'), nullable=False)
+    swiss_lichess_id = db.Column(db.String, db.ForeignKey('swiss.lichess_id'), nullable=False)
     swiss = db.relationship('Swiss', backref=db.backref('entries', lazy=True))
 
-    username = db.Column(db.Integer, db.ForeignKey('user.name'), nullable=False)
+    username = db.Column(db.String, db.ForeignKey('user.name'), nullable=False)
     user = db.relationship('User', backref=db.backref('entries', lazy=True))
 
     def __init__(self, points, rank, league_points, swiss_lichess_id, username):
