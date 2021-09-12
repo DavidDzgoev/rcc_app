@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime
-from main import db
+from app import db
 import requests
 import json
 
@@ -14,7 +14,7 @@ class User(db.Model):
         self.name = name
 
     def __repr__(self):
-        return self.name
+        return f'User-{self.name}'
 
 
 class Entry(db.Model):
@@ -37,7 +37,7 @@ class Entry(db.Model):
         self.username = username
 
     def __repr__(self):
-        return '<Entry %r>' % self.username
+        return f'<Entry-{self.swiss_lichess_id}-{self.username}>'
 
 
 class Swiss(db.Model):
@@ -60,7 +60,7 @@ class Swiss(db.Model):
         self.number_of_players = number_of_players
 
     def __repr__(self):
-        return '<Tournament %r>' % self.name
+        return f'<Tournament-{self.name}-{self.lichess_id}'
 
 
 def calculate_league_points(rank: int):
@@ -84,14 +84,14 @@ def calculate_league_points(rank: int):
 
 def fill_db():
     """
-    Parse data from lichess api and collect it in the db
+    Parse data of all tournaments of the club from lichess api and collect it in the db
     :return: None
     """
     swiss_as_list_of_string = requests.get('https://lichess.org/api/team/romes-papa-club/swiss').text.split('\n')
     swiss_as_list_of_json = [json.loads(i) for i in swiss_as_list_of_string[:-1]]
 
-    db_users_as_set = set(User.query.all())
-    swiss_users_as_set = set()
+    db_users = set(User.query.all())
+    swiss_users = set()
 
     for swiss in swiss_as_list_of_json:
         db.session.add(Swiss(
@@ -104,10 +104,11 @@ def fill_db():
             number_of_players=swiss['nbPlayers']
         ))
 
-        entries_as_list_of_string = requests.get(f'https://lichess.org/api/swiss/{swiss["id"]}/results').text.split(
-            '\n')
+        entries_as_list_of_string = requests.get(
+            f'https://lichess.org/api/swiss/{swiss["id"]}/results').text.split('\n')
+
         for entry_as_json in [json.loads(i) for i in entries_as_list_of_string[:-1]]:
-            swiss_users_as_set.add(entry_as_json['username'])
+            swiss_users.add(entry_as_json['username'])
 
             db.session.add(Entry(
                 points=entry_as_json['points'],
@@ -117,19 +118,65 @@ def fill_db():
                 username=entry_as_json['username']
             ))
 
-    new_users = swiss_users_as_set - db_users_as_set
-    for username in new_users:
+    for new_username in swiss_users - db_users:
         db.session.add(User(
-            name=username
+            name=new_username
         ))
 
     db.session.commit()
     return
 
 
-def make_leaderboard():
+def update_db():
     """
-    Make aggregated and sorted leaderbord from db
+    Update db data by comparing with lichess data
+    :return:
+    """
+    swiss_as_list_of_string = requests.get('https://lichess.org/api/team/romes-papa-club/swiss').text.split('\n')
+    swiss_as_list_of_json = [json.loads(i) for i in swiss_as_list_of_string[:-1]]
+
+    swiss_ids = set([i['id'] for i in swiss_as_list_of_json])
+    db_swiss_ids = set([i.lichess_id for i in list(db.session.query(Swiss).all())])
+
+    db_users = set(User.query.all())
+    swiss_users = set()
+
+    for new_swiss in swiss_ids - db_swiss_ids:
+        db.session.add(Swiss(
+            lichess_id=new_swiss['id'],
+            name=new_swiss['name'],
+            start_at=datetime.datetime.strptime(new_swiss['startsAt'][:10], "%Y-%m-%d").date(),
+            time_limit=new_swiss['clock']['limit'],
+            increment=new_swiss['clock']['increment'],
+            number_of_rounds=new_swiss['nbRounds'],
+            number_of_players=new_swiss['nbPlayers']
+        ))
+
+        entries_as_list_of_string = requests.get(f'https://lichess.org/api/swiss/{new_swiss["id"]}/results').text.split(
+            '\n')
+        for entry_as_json in [json.loads(i) for i in entries_as_list_of_string[:-1]]:
+            swiss_users.add(entry_as_json['username'])
+
+            db.session.add(Entry(
+                points=entry_as_json['points'],
+                rank=entry_as_json['rank'],
+                league_points=calculate_league_points(entry_as_json['rank']),
+                swiss_lichess_id=new_swiss['id'],
+                username=entry_as_json['username']
+            ))
+
+    for new_username in swiss_users - db_users:
+        db.session.add(User(
+            name=new_username
+        ))
+
+    db.session.commit()
+    return
+
+
+def get_leaderboard_data():
+    """
+    Return aggregated and sorted leaderbord from db
     :return: dict
     """
     df = pd.read_sql(db.session.query(Entry).statement, db.session.bind, index_col='id')
@@ -146,3 +193,4 @@ def make_leaderboard():
 if __name__ == '__main__':
     db.create_all()
     fill_db()
+    update_db()
