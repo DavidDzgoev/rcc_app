@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-
+import os
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://khwvbuqamcctie' \
@@ -19,4 +19,5 @@ def hello_world():
 
 if __name__ == '__main__':
     from db import update_db, get_leaderboard_data
-    app.run()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
