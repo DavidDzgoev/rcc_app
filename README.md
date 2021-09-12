@@ -1,4 +1,4 @@
-###romespapa chess club web-site
+### romespapa chess club web-site
 
 > :warning: The design and frontend of the application is still in development
 
