@@ -12,7 +12,7 @@ db = SQLAlchemy(app)
 
 
 @app.route("/")
-def hello_world():
+def leaderboard():
     update_db()
     return get_leaderboard_data()
 
