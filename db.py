@@ -185,12 +185,28 @@ def get_leaderboard_data():
                                                    mean_rank=('rank', 'mean'),
                                                    sum_entries=('swiss_lichess_id', 'count')
                                                    )
+    leaderboard_as_df = leaderboard_as_df.round({'mean_points': 2, 'mean_rank': 2})
     leaderboard_as_df.sort_values(by='sum_league_points', ascending=False, inplace=True)
 
     return leaderboard_as_df.to_dict('index')
 
 
+def get_counter_stats():
+    """
+    Return stats for template "О нас.html"
+    :return: dict {'number_of_seasons', 'number_of_swiss', 'number_of_players'}
+    """
+    number_of_players = len(db.session.query(User).all())
+    number_of_swiss = len(db.session.query(Swiss).all())
+    number_of_seasons = 2
+
+    return {'number_of_seasons': number_of_seasons,
+            'number_of_swiss': number_of_swiss,
+            'number_of_players': number_of_players}
+
+
 if __name__ == '__main__':
-    db.create_all()
-    fill_db()
-    update_db()
+    pass
+    # db.create_all()
+    # fill_db()
+    # update_db()
