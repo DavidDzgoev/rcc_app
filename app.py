@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect
+from flask import Flask, render_template, redirect, request
 from flask_sqlalchemy import SQLAlchemy
 import os
 
@@ -17,16 +17,43 @@ async def root():
     return redirect('/about', code=302)
 
 
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template('404.html'), 404
+
+
 @app.route('/standings')
-async def standings(season=None):
+async def standings():
+    season = request.args.get('season')
     update_db()
-    return render_template('Таблица-лидеров.html', df=get_leaderboard_data())
+
+    all_seasons = get_seasons()
+    all_seasons.reverse()
+
+    if not season:
+        season = all_seasons[0]
+
+    return render_template('Таблица-лидеров.html',
+                           df=get_leaderboard_data(season),
+                           seasons_list=all_seasons,
+                           selected_season=season)
 
 
 @app.route('/prev_swiss')
-async def prev_swiss(season=None):
+async def prev_swiss():
+    season = request.args.get('season')
     update_db()
-    return render_template('Предыдущие-турниры.html', df=get_leaderboard_data())
+
+    all_seasons = get_seasons()
+    all_seasons.reverse()
+
+    if not season:
+        season = all_seasons[0]
+
+    return render_template('Предыдущие-турниры.html',
+                           df=get_prev_swiss_date(season),
+                           seasons_list=all_seasons,
+                           selected_season=season)
 
 
 @app.route('/about')
@@ -36,6 +63,7 @@ async def about():
 
 
 if __name__ == '__main__':
-    from db import update_db, get_leaderboard_data, get_counter_stats
+    from db import update_db, get_leaderboard_data, get_counter_stats, get_prev_swiss_date, get_seasons
+
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
