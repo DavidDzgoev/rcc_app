@@ -116,10 +116,6 @@ def calculate_league_points(rank: int, season_name):
         return 0
 
 
-def get_season_by_date(date):
-    return db.session.query(Season.name).filter((Season.start_date <= date) & (Season.end_date >= date)).first()[0]
-
-
 def fill_db():
     """
     Parse data of all tournaments of the club from lichess api and collect it in the db
@@ -143,7 +139,9 @@ def fill_db():
     swiss_as_list_of_json = [json.loads(i) for i in swiss_as_list_of_string[:-1]]
 
     for swiss in swiss_as_list_of_json:
-        season_name = get_season_by_date(datetime.datetime.strptime(swiss['startsAt'][:10], "%Y-%m-%d").date())
+        date = datetime.datetime.strptime(swiss['startsAt'][:10], "%Y-%m-%d").date()
+        season_name = db.session.query(Season.name).filter((Season.start_date <= date) & (Season.end_date >= date)).first()[0]
+
         db.session.add(Swiss(
             lichess_id=swiss['id'],
             name=swiss['name'],
@@ -173,6 +171,7 @@ def fill_db():
             ))
 
     db.session.commit()
+    db.session.close()
     return
 
 
@@ -191,7 +190,11 @@ def update_db():
 
     for new_swiss in swiss_ids - db_swiss_ids:
         s = swiss_as_dict[new_swiss]
-        season_name = get_season_by_date(datetime.datetime.strptime(s['startsAt'][:10], "%Y-%m-%d").date())
+
+        date = datetime.datetime.strptime(s['startsAt'][:10], "%Y-%m-%d").date()
+        season_name = \
+        db.session.query(Season.name).filter((Season.start_date <= date) & (Season.end_date >= date)).first()[0]
+
         db.session.add(Swiss(
             lichess_id=s['id'],
             name=s['name'],
@@ -220,6 +223,7 @@ def update_db():
             ))
 
     db.session.commit()
+    db.session.close()
     return
 
 
@@ -244,6 +248,7 @@ def get_leaderboard_data(season):
     leaderboard_as_df.sort_values(by='sum_league_points', ascending=False, inplace=True)
     leaderboard_as_df.reset_index(inplace=True)
 
+    db.session.close()
     return leaderboard_as_df.to_dict('index')
 
 
@@ -262,6 +267,7 @@ def get_prev_swiss_date(season):
     df['time_limit'] = df['time_limit'] // 60
     df['start_at'] = pd.to_datetime(df['start_at']).dt.strftime('%d.%m.%Y')
 
+    db.session.close()
     return df.to_dict('index')
 
 
@@ -270,7 +276,10 @@ def get_seasons():
     Return list of seasons names as str
     :return: list of str from old to new
     """
-    return [str(i) for i in db.session.query(Season).order_by(Season.id).all()]
+    seasons = db.session.query(Season).order_by(Season.id).all()
+
+    db.session.close()
+    return [str(i) for i in seasons]
 
 
 def get_counter_stats():
@@ -282,6 +291,7 @@ def get_counter_stats():
     number_of_swiss = len(db.session.query(Swiss).all())
     number_of_seasons = len(db.session.query(Season).all())
 
+    db.session.close()
     return {'number_of_seasons': number_of_seasons,
             'number_of_swiss': number_of_swiss,
             'number_of_players': number_of_players}
@@ -292,4 +302,4 @@ if __name__ == '__main__':
     # print(get_leaderboard_data(None))
     db.create_all()
     fill_db()
-    # update_db()
+    update_db()
